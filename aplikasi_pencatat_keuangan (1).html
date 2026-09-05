@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DompetKu - Catatan Keuangan</title>
+    <!-- Menggunakan Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Menggunakan Lucide Icons untuk ikon -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Konfigurasi tema Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                        secondary: '#10b981',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Menyembunyikan scrollbar untuk tampilan yang lebih bersih, tapi tetap bisa di-scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        /* Animasi untuk modal */
+        .modal-enter {
+            animation: slideUp 0.3s ease-out forwards;
+        }
+        .modal-leave {
+            animation: slideDown 0.3s ease-in forwards;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(100%); opacity: 0; }
+        }
+
+        /* Glassmorphism effect untuk header */
+        .glass-header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex justify-center bg-slate-200">
+
+    <!-- Kontainer utama (Mobile View) -->
+    <main class="w-full max-w-md bg-white h-full relative overflow-hidden shadow-2xl flex flex-col">
+        
+        <!-- Header -->
+        <header class="glass-header sticky top-0 z-10 px-6 py-4 flex justify-between items-center border-b border-slate-100">
+            <div>
+                <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="wallet" class="text-primary"></i> DompetKu
+                </h1>
+                <p class="text-xs text-slate-500" id="current-date">Hari ini</p>
+            </div>
+            <button onclick="resetData()" class="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-danger transition">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </button>
+        </header>
+
+        <!-- Area Konten Utama yang bisa di-scroll -->
+        <div class="flex-1 overflow-y-auto no-scrollbar pb-24">
+            
+            <!-- Kartu Saldo Utama -->
+            <section class="p-6 pt-4">
+                <div class="bg-gradient-to-br from-primary to-indigo-700 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 relative overflow-hidden">
+                    <!-- Ornamen background -->
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
+                    <div class="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-10 -mb-10"></div>
+                    
+                    <p class="text-indigo-200 text-sm font-medium mb-1">Total Saldo</p>
+                    <h2 class="text-3xl font-bold tracking-tight mb-6" id="total-balance">Rp 0</h2>
+                    
+                    <div class="flex justify-between border-t border-indigo-400 border-opacity-30 pt-4 mt-2">
+                        <!-- Info Pemasukan -->
+                        <div>
+                            <div class="flex items-center gap-1 text-indigo-200 mb-1">
+                                <i data-lucide="arrow-down-circle" class="w-4 h-4 text-emerald-400"></i>
+                                <span class="text-xs">Pemasukan</span>
+                            </div>
+                            <p class="font-semibold text-sm" id="total-income">Rp 0</p>
+                        </div>
+                        
+                        <!-- Info Pengeluaran -->
+                        <div class="text-right">
+                            <div class="flex items-center justify-end gap-1 text-indigo-200 mb-1">
+                                <i data-lucide="arrow-up-circle" class="w-4 h-4 text-rose-400"></i>
+                                <span class="text-xs">Pengeluaran</span>
+                            </div>
+                            <p class="font-semibold text-sm" id="total-expense">Rp 0</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grafik Mini (Representasi visual rasio) -->
+            <section class="px-6 mb-6">
+                <div class="flex justify-between text-xs text-slate-500 mb-2 font-medium">
+                    <span>Rasio Keuangan Bulan Ini</span>
+                    <span id="ratio-text">0%</span>
+                </div>
+                <div class="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                    <div id="bar-income" class="h-full bg-emerald-500 transition-all duration-500" style="width: 50%;"></div>
+                    <div id="bar-expense" class="h-full bg-rose-500 transition-all duration-500" style="width: 50%;"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                    <span>In</span>
+                    <span>Out</span>
+                </div>
+            </section>
+
+            <!-- Daftar Transaksi Terakhir -->
+            <section class="px-6 pb-6">
+                <div class="flex justify-between items-end mb-4">
+                    <h3 class="font-semibold text-slate-800">Transaksi Terakhir</h3>
+                    <span class="text-xs text-primary font-medium cursor-pointer">Lihat Semua</span>
+                </div>
+                
+                <!-- Kontainer Daftar Transaksi (Diisi oleh JS) -->
+                <div id="transaction-list" class="space-y-4">
+                    <!-- Transaksi kosong sebagai placeholder awal -->
+                    <div class="text-center py-8 text-slate-400 text-sm" id="empty-state">
+                        <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                        Belum ada transaksi.<br>Mulai catat keuanganmu!
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tombol Tambah Transaksi Mengambang (FAB) -->
+        <button onclick="openModal()" class="absolute bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-indigo-200 flex items-center justify-center hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all z-20">
+            <i data-lucide="plus" class="w-6 h-6"></i>
+        </button>
+
+        <!-- Overlay Modal -->
+        <div id="modal-overlay" class="hidden absolute inset-0 bg-slate-900 bg-opacity-50 z-30 backdrop-blur-sm transition-opacity" onclick="closeModal(event)"></div>
+
+        <!-- Modal Tambah Transaksi -->
+        <div id="transaction-modal" class="hidden absolute bottom-0 left-0 w-full bg-white rounded-t-3xl z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[85vh]">
+            
+            <!-- Handle untuk drag (visual saja) -->
+            <div class="w-full flex justify-center pt-3 pb-1" onclick="closeModal()">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full cursor-pointer"></div>
+            </div>
+
+            <div class="px-6 pb-6 overflow-y-auto no-scrollbar">
+                <div class="flex justify-between items-center mb-6 mt-2">
+                    <h2 class="text-lg font-bold text-slate-800">Catat Transaksi</h2>
+                    <button onclick="closeModal()" class="p-1 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <form id="transaction-form" onsubmit="handleFormSubmit(event)">
+                    
+                    <!-- Pilihan Tipe Transaksi (Pemasukan / Pengeluaran) -->
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+                        <button type="button" id="btn-expense" onclick="setTransactionType('expense')" class="flex-1 py-2 text-sm font-medium rounded-lg bg-white shadow-sm text-rose-600 transition-all">
+                            Pengeluaran
+                        </button>
+                        <button type="button" id="btn-income" onclick="setTransactionType('income')" class="flex-1 py-2 text-sm font-medium rounded-lg text-slate-500 transition-all">
+                            Pemasukan
+                        </button>
+                    </div>
+                    <input type="hidden" id="input-type" value="expense">
+
+                    <!-- Input Nominal -->
+                    <div class="mb-5">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Nominal (Rp)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Rp</span>
+                            <input type="number" id="input-amount" required min="1" placeholder="0" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xl font-bold rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Input Kategori -->
+                    <div class="mb-5">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Kategori</label>
+                        <select id="input-category" required class="w-full bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent appearance-none">
+                            <option value="" disabled selected>Pilih kategori...</option>
+                            <!-- Opsi Pengeluaran -->
+                            <optgroup label="Pengeluaran" id="optgroup-expense">
+                                <option value="makanan">🍔 Makanan & Minuman</option>
+                                <option value="transportasi">🚗 Transportasi</option>
+                                <option value="belanja">🛍️ Belanja</option>
+                                <option value="tagihan">📄 Tagihan & Utilitas</option>
+                                <option value="hiburan">🎬 Hiburan</option>
+                                <option value="lainnya_out">📦 Lainnya</option>
+                            </optgroup>
+                            <!-- Opsi Pemasukan (disembunyikan secara default oleh JS nantinya) -->
+                            <optgroup label="Pemasukan" id="optgroup-income" class="hidden">
+                                <option value="gaji">💰 Gaji</option>
+                                <option value="bonus">🎁 Bonus</option>
+                                <option value="investasi">📈 Hasil Investasi</option>
+                                <option value="lainnya_in">💵 Lainnya</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Input Catatan -->
+                    <div class="mb-6">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Catatan (Opsional)</label>
+                        <input type="text" id="input-note" placeholder="Contoh: Makan siang nasi padang" class="w-full bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    </div>
+
+                    <!-- Tombol Simpan -->
+                    <button type="submit" class="w-full bg-primary hover:bg-indigo-700 text-white font-semibold rounded-xl py-4 shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]">
+                        Simpan Transaksi
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Inisialisasi ikon Lucide
+        lucide.createIcons();
+
+        // State Aplikasi
+        let transactions = [];
+        let currentType = 'expense'; // Default tipe saat modal dibuka
+
+        // Konfigurasi Kategori (Untuk ikon dan warna)
+        const categoryConfig = {
+            'makanan': { icon: 'utensils', color: 'bg-orange-100 text-orange-500', name: 'Makanan' },
+            'transportasi': { icon: 'car', color: 'bg-blue-100 text-blue-500', name: 'Transportasi' },
+            'belanja': { icon: 'shopping-bag', color: 'bg-pink-100 text-pink-500', name: 'Belanja' },
+            'tagihan': { icon: 'file-text', color: 'bg-purple-100 text-purple-500', name: 'Tagihan' },
+            'hiburan': { icon: 'film', color: 'bg-indigo-100 text-indigo-500', name: 'Hiburan' },
+            'gaji': { icon: 'banknote', color: 'bg-emerald-100 text-emerald-500', name: 'Gaji' },
+            'bonus': { icon: 'gift', color: 'bg-teal-100 text-teal-500', name: 'Bonus' },
+            'investasi': { icon: 'trending-up', color: 'bg-cyan-100 text-cyan-500', name: 'Investasi' },
+            'lainnya_out': { icon: 'box', color: 'bg-slate-100 text-slate-500', name: 'Lainnya' },
+            'lainnya_in': { icon: 'box', color: 'bg-slate-100 text-slate-500', name: 'Lainnya' }
+        };
+
+        // Format Uang Rupiah
+        const formatRupiah = (number) => {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(number);
+        };
+
+        // Format Tanggal
+        const setDateHeader = () => {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const today = new Date().toLocaleDateString('id-ID', options);
+            document.getElementById('current-date').textContent = today;
+        };
+
+        // Load Data dari Local Storage
+        const loadData = () => {
+            const savedData = localStorage.getItem('dompetku_data');
+            if (savedData) {
+                try {
+                    transactions = JSON.parse(savedData);
+                } catch (e) {
+                    console.error("Gagal membaca data", e);
+                    transactions = [];
+                }
+            } else {
+                // Data dummy untuk tampilan awal jika kosong
+                transactions = [
+                    { id: 1, type: 'income', amount: 5000000, category: 'gaji', note: 'Gaji Bulan Ini', date: new Date().toISOString() },
+                    { id: 2, type: 'expense', amount: 150000, category: 'makanan', note: 'Makan bareng teman', date: new Date().toISOString() },
+                    { id: 3, type: 'expense', amount: 50000, category: 'transportasi', note: 'Isi Bensin', date: new Date().toISOString() }
+                ];
+                saveData();
+            }
+            updateUI();
+        };
+
+        // Simpan Data ke Local Storage
+        const saveData = () => {
+            localStorage.setItem('dompetku_data', JSON.stringify(transactions));
+        };
+
+        // Reset Data (Hapus semua)
+        const resetData = () => {
+            if(confirm("Apakah Anda yakin ingin menghapus SEMUA data transaksi? Tindakan ini tidak bisa dibatalkan.")) {
+                transactions = [];
+                saveData();
+                updateUI();
+            }
+        }
+
+        // Update Tampilan Utama (Dashboard & List)
+        const updateUI = () => {
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            // Hitung total
+            transactions.forEach(trx => {
+                if (trx.type === 'income') {
+                    totalIncome += Number(trx.amount);
+                } else {
+                    totalExpense += Number(trx.amount);
+                }
+            });
+
+            const currentBalance = totalIncome - totalExpense;
+
+            // Update Teks Saldo
+            document.getElementById('total-balance').textContent = formatRupiah(currentBalance);
+            document.getElementById('total-income').textContent = formatRupiah(totalIncome);
+            document.getElementById('total-expense').textContent = formatRupiah(totalExpense);
+
+            // Update Progress Bar Rasio
+            const totalActivity = totalIncome + totalExpense;
+            const incomePercentage = totalActivity === 0 ? 50 : (totalIncome / totalActivity) * 100;
+            const expensePercentage = totalActivity === 0 ? 50 : (totalExpense / totalActivity) * 100;
+
+            document.getElementById('bar-income').style.width = `${incomePercentage}%`;
+            document.getElementById('bar-expense').style.width = `${expensePercentage}%`;
+            
+            // Format rasio teks (contoh: Pemasukan lebih besar)
+            if(totalActivity > 0) {
+                 document.getElementById('ratio-text').textContent = `In ${Math.round(incomePercentage)}% : Out ${Math.round(expensePercentage)}%`;
+            } else {
+                 document.getElementById('ratio-text').textContent = 'Belum ada aktivitas';
+            }
+
+
+            // Render Daftar Transaksi
+            renderTransactionList();
+        };
+
+        // Render HTML untuk Daftar Transaksi
+        const renderTransactionList = () => {
+            const listContainer = document.getElementById('transaction-list');
+            const emptyState = document.getElementById('empty-state');
+
+            // Kosongkan list yang ada (kecuali empty state)
+            listContainer.innerHTML = '';
+
+            if (transactions.length === 0) {
+                listContainer.appendChild(emptyState);
+                emptyState.style.display = 'block';
+                return;
+            } else {
+                emptyState.style.display = 'none';
+            }
+
+            // Urutkan dari yang terbaru (berdasarkan urutan array/waktu insert)
+            const reversedTransactions = [...transactions].reverse();
+
+            reversedTransactions.forEach(trx => {
+                const conf = categoryConfig[trx.category] || categoryConfig['lainnya_out'];
+                const isIncome = trx.type === 'income';
+                const amountColor = isIncome ? 'text-emerald-500' : 'text-slate-800';
+                const operator = isIncome ? '+' : '-';
+                
+                // Format waktu sederhana
+                const dateObj = new Date(trx.date);
+                const timeString = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+
+                const itemHTML = `
+                    <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center ${conf.color}">
+                                <i data-lucide="${conf.icon}" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-slate-800 capitalize">${conf.name}</h4>
+                                <p class="text-xs text-slate-500 flex items-center gap-1">
+                                    <i data-lucide="clock" class="w-3 h-3"></i> ${timeString}
+                                    ${trx.note ? `• ${trx.note}` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-bold ${amountColor}">
+                                ${operator}${formatRupiah(trx.amount).replace('Rp', '').trim()}
+                            </span>
+                            <button onclick="deleteTransaction(${trx.id})" class="block w-full text-right text-[10px] text-slate-300 hover:text-danger mt-1">
+                                Hapus
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Parse string ke HTML node
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(itemHTML, 'text/html');
+                const node = doc.body.firstChild;
+                
+                listContainer.appendChild(node);
+            });
+
+            // Re-inisialisasi ikon Lucide untuk elemen yang baru dirender
+            lucide.createIcons();
+        };
+
+        // Manajemen Modal
+        const modal = document.getElementById('transaction-modal');
+        const overlay = document.getElementById('modal-overlay');
+
+        const openModal = () => {
+            overlay.classList.remove('hidden');
+            modal.classList.remove('hidden');
+            
+            // Animasi masuk
+            modal.classList.remove('modal-leave');
+            modal.classList.add('modal-enter');
+            
+            // Set fokus ke input nominal
+            setTimeout(() => document.getElementById('input-amount').focus(), 100);
+        };
+
+        const closeModal = (e) => {
+            // Cegah tutup jika klik di dalam modal
+            if (e && e.target === modal) return;
+
+            // Animasi keluar
+            modal.classList.remove('modal-enter');
+            modal.classList.add('modal-leave');
+            
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                modal.classList.add('hidden');
+                // Reset form setelah ditutup
+                document.getElementById('transaction-form').reset();
+                setTransactionType('expense'); // Kembali ke default
+            }, 300); // Sesuaikan dengan durasi animasi CSS
+        };
+
+        // Manajemen Tab Tipe Transaksi dalam Modal
+        const setTransactionType = (type) => {
+            currentType = type;
+            const btnExpense = document.getElementById('btn-expense');
+            const btnIncome = document.getElementById('btn-income');
+            const inputType = document.getElementById('input-type');
+            
+            // Elemen Optgroup kategori
+            const groupExpense = document.getElementById('optgroup-expense');
+            const groupIncome = document.getElementById('optgroup-income');
+            const selectCategory = document.getElementById('input-category');
+
+            inputType.value = type;
+
+            if (type === 'expense') {
+                // Styling tombol
+                btnExpense.classList.add('bg-white', 'shadow-sm', 'text-rose-600');
+                btnExpense.classList.remove('text-slate-500');
+                btnIncome.classList.remove('bg-white', 'shadow-sm', 'text-emerald-600');
+                btnIncome.classList.add('text-slate-500');
+                
+                // Tampilkan kategori pengeluaran, sembunyikan pemasukan
+                groupExpense.classList.remove('hidden');
+                groupIncome.classList.add('hidden');
+                
+            } else {
+                // Styling tombol
+                btnIncome.classList.add('bg-white', 'shadow-sm', 'text-emerald-600');
+                btnIncome.classList.remove('text-slate-500');
+                btnExpense.classList.remove('bg-white', 'shadow-sm', 'text-rose-600');
+                btnExpense.classList.add('text-slate-500');
+
+                // Tampilkan kategori pemasukan, sembunyikan pengeluaran
+                groupIncome.classList.remove('hidden');
+                groupExpense.classList.add('hidden');
+            }
+            
+            // Reset pilihan select agar pengguna harus memilih kategori yang sesuai tipe baru
+            selectCategory.selectedIndex = 0; 
+        };
+
+        // Penanganan Submit Form
+        const handleFormSubmit = (e) => {
+            e.preventDefault();
+
+            const type = document.getElementById('input-type').value;
+            const amount = document.getElementById('input-amount').value;
+            const category = document.getElementById('input-category').value;
+            const note = document.getElementById('input-note').value;
+
+            if (!amount || !category) {
+                alert("Nominal dan Kategori harus diisi!");
+                return;
+            }
+
+            const newTransaction = {
+                id: Date.now(), // Generate ID unik berdasarkan timestamp
+                type: type,
+                amount: parseInt(amount),
+                category: category,
+                note: note,
+                date: new Date().toISOString()
+            };
+
+            // Tambahkan ke array
+            transactions.push(newTransaction);
+            
+            // Simpan dan update UI
+            saveData();
+            updateUI();
+            
+            // Tutup modal
+            closeModal();
+        };
+
+        // Penanganan Hapus Transaksi
+        const deleteTransaction = (id) => {
+            if(confirm("Hapus transaksi ini?")) {
+                transactions = transactions.filter(trx => trx.id !== id);
+                saveData();
+                updateUI();
+            }
+        };
+
+        // Inisialisasi saat halaman dimuat
+        window.onload = () => {
+            setDateHeader();
+            loadData();
+        };
+    </script>
+</body>
+</html>
