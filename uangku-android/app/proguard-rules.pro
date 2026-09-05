@@ -1,0 +1,1 @@
+# UangKu release rules
